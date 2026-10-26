@@ -8,10 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
-<script>window.MathJax = {tex: {inlineMath: [['\\(', '\\)']]}, svg: {fontCache: 'global'}, options: {enableMenu: false}};</script>
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
 <style>
-/* Layout: question card beside the bell curve and its z/x table; the worked steps run in one row beneath. */
+/* Layout: question card beside the bell curve and its z/x table. */
 :root{
   --bg:#E8EEF3; --surface:#FFFFFF; --ink:#13222D; --muted:#566772; --line:#C8D4DC; --head:#EEF3F7;
   --accent:#0B6A8A; --accent-ink:#FFFFFF; --accent-soft:#D5EAF2;
@@ -57,16 +55,14 @@ h1{font-family:var(--display); font-weight:600; font-size:clamp(26px,3.6vw,34px)
 .scoreline b{color:var(--ink); font-variant-numeric:tabular-nums}
 .linkish{background:none; border:0; color:var(--muted); text-decoration:underline; padding:2px; font-size:13px}
 
-.layout{display:grid; gap:14px; grid-template-columns:minmax(0,1fr); grid-template-areas:"quiz" "fig" "work"}
+.layout{display:grid; gap:14px; grid-template-columns:minmax(0,1fr); grid-template-areas:"quiz" "fig"}
 @media (min-width:860px){
-  .layout{grid-template-columns:minmax(260px,340px) minmax(0,1fr); grid-template-areas:"quiz fig" "work work"}
+  .layout{grid-template-columns:minmax(260px,340px) minmax(0,1fr); grid-template-areas:"quiz fig"}
 }
-.quiz{grid-area:quiz} .figcard{grid-area:fig} .workcard{grid-area:work}
+.quiz{grid-area:quiz} .figcard{grid-area:fig}
 .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; min-width:0}
 .quiz{padding:14px 16px}
 .figcard{padding:12px 14px; display:flex; flex-direction:column; justify-content:center}
-.workcard{padding:12px 16px}
-h2{font-family:var(--display); font-weight:600; font-size:18px; margin:0 0 6px}
 .qmeta{display:flex; justify-content:space-between; gap:12px; align-items:baseline; color:var(--muted); font-size:13px}
 .qmeta .label{text-transform:uppercase; letter-spacing:.08em; font-weight:600; font-size:12px}
 .tag{font-weight:600; color:var(--accent)}
@@ -92,8 +88,6 @@ button{font:inherit; cursor:pointer}
 .fb.bad{background:var(--bad-bg); color:var(--bad)}
 .fb.info{background:var(--info-bg); color:var(--info)}
 .num{font-family:var(--mono)}
-mjx-container{color:inherit}
-mjx-container svg{vertical-align:middle}
 
 /* figure: curve, z row and x row share seven equal columns so ticks line up with the cells */
 .figscroll{overflow-x:auto}
@@ -124,16 +118,6 @@ input.cell:read-only{cursor:default}
 .cell.filled{background:var(--accent-soft); border-color:var(--accent); font-weight:700}
 .caption{font-size:12.5px; color:var(--muted); margin:6px 0 0}
 
-.workhead{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap}
-.work{display:grid; gap:8px; margin:0; padding:0; list-style:none; grid-template-columns:repeat(2,minmax(0,1fr))}
-@media (min-width:760px){ .work{grid-template-columns:repeat(var(--n,4),minmax(0,1fr))} }
-.work li{display:flex; flex-direction:column; gap:2px; padding:8px 12px; border-radius:8px; background:var(--head); min-height:74px; min-width:0}
-.work .k{font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; color:var(--muted)}
-.work .k .g{text-transform:none; font-size:15px}
-.work .v{font-size:18px; overflow-x:auto; overflow-y:hidden; display:flex; align-items:center; flex:1}
-.work li.off .v{color:var(--muted)}
-.work li.on{background:var(--hl-soft)}
-.work li.on .v{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){*{scroll-behavior:auto !important; transition:none !important}}
 </style>
 </head>
@@ -181,10 +165,6 @@ input.cell:read-only{cursor:default}
       <p class="caption" id="figcap"></p>
     </section>
 
-    <section class="card workcard" aria-label="Worked solution">
-      <div class="workhead"><h2>Work</h2><span class="caption" id="workcap">Each hint fills in a step.</span></div>
-      <ul class="work" id="work"></ul>
-    </section>
   </div>
 </main>
 
@@ -211,13 +191,9 @@ input.cell:read-only{cursor:default}
   function zlab(z){ return (z < 0 ? MINUS : '') + Math.abs(z); }
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
   function pdf(z){ return Math.exp(-z*z/2)/Math.sqrt(2*Math.PI); }
-  function T(s){ return '\\(' + s + '\\)'; }
-  function typeset(el){
-    if (window.MathJax && window.MathJax.typesetPromise) window.MathJax.typesetPromise([el]).catch(function(){});
-  }
 
   var fb = $('fb'), ans = $('ans'), primary = $('primary'), hintBtn = $('hintBtn'), revealBtn = $('revealBtn');
-  var mode = 'mixed', q = null, status = 'open', attempts = 0, hintLevel = 0, shown = 0, steps = [], hintSteps = [1,2];
+  var mode = 'mixed', q = null, status = 'open', attempts = 0, hintLevel = 0;
   var n = 0, first = 0, streak = 0, qnum = 0, seq = 0, bSeq = 0;
 
   /* ---------- static curve ---------- */
@@ -266,63 +242,18 @@ input.cell:read-only{cursor:default}
     }
   }
 
-  /* ---------- work steps ---------- */
-  function G(s){ return '<span class="g">' + s + '</span>'; }
-  function buildSteps(){
-    var u = '\\ \\text{' + q.c.unit + '}', sd = q.sd, mu = q.mu, s;
-    if (q.type === 'fill'){
-      var p = r2(2 * sd);
-      steps = [
-        {k:'Z-score formula', t:'z = \\dfrac{x - \\mu}{\\sigma}'},
-        {k:'Substitute (z = 2)', t:'2 = \\dfrac{x - ' + num(mu) + '}{' + num(sd) + '}'},
-        {k:'Multiply both sides by ' + G('&sigma;'), t:num(p) + ' = x - ' + num(mu)},
-        {k:'Add ' + G('&mu;') + ' to both sides', t:'x = ' + num(p) + ' + ' + num(mu) + ' = ' + num(r2(mu + p)) + u}
-      ];
-      hintSteps = [1,2];
-      $('workcap').textContent = 'Hints work one cell, z = 2, as an example.';
-    } else {
-      var a = Z[q.given[0]], b = Z[q.given[1]], xa = q.vals[q.given[0]], xb = q.vals[q.given[1]], d = b - a, delta = r2(xb - xa);
-      q.a = a; q.b = b; q.xa = xa; q.xb = xb; q.d = d; q.delta = delta;
-      if (q.type === 'sd'){
-        steps = [
-          {k:'Z-steps apart', t:num(b) + ' - ' + par(a) + ' = ' + d},
-          {k:'Change in value', t:num(xb) + ' - ' + num(xa) + ' = ' + num(delta)},
-          {k:'Divide to find ' + G('&sigma;'), t:'\\sigma = \\dfrac{' + num(delta) + '}{' + d + '} = ' + num(sd) + u}
-        ];
-        hintSteps = [1,2];
-      } else {
-        steps = [
-          {k:'Find ' + G('&sigma;') + ' from the spacing', t:'\\sigma = \\dfrac{' + num(xb) + ' - ' + num(xa) + '}{' + num(b) + ' - ' + par(a) + '} = ' + num(sd)},
-          {k:'Z-score formula', t:'z = \\dfrac{x - \\mu}{\\sigma}'},
-          {k:'Substitute a known value', t:num(b) + ' = \\dfrac{' + num(xb) + ' - \\mu}{' + num(sd) + '}'},
-          {k:'Solve for ' + G('&mu;'), t:'\\mu = ' + num(xb) + ' - (' + num(b) + ')(' + num(sd) + ') = ' + num(mu) + u}
-        ];
-        hintSteps = [1,3];
-      }
-      $('workcap').textContent = 'Each hint fills in steps.';
-    }
-    var ul = $('work'), h = '', i;
-    ul.style.setProperty('--n', steps.length);
-    for (i = 0; i < steps.length; i++) h += '<li class="off" id="w' + i + '"><span class="k">' + steps[i].k + '</span><span class="v"></span></li>';
-    ul.innerHTML = h;
-    shown = 0;
-  }
-  function showWork(upTo){
-    shown = Math.max(shown, upTo);
-    steps.forEach(function(st, i){
-      var li = $('w' + i), v = li.querySelector('.v'), on = i < shown;
-      if (on && li.className === 'on') return;
-      li.className = on ? 'on' : 'off';
-      v.innerHTML = on ? T(st.t) : '—';
-      if (on) typeset(v);
-    });
+  /* ---------- shown pair, used for feedback ---------- */
+  function setPair(){
+    if (q.type === 'fill') return;
+    q.a = Z[q.given[0]]; q.b = Z[q.given[1]];
+    q.xa = q.vals[q.given[0]]; q.xb = q.vals[q.given[1]];
+    q.d = q.b - q.a; q.delta = r2(q.xb - q.xa);
   }
 
   /* ---------- questions ---------- */
   function showFb(kind, title, html){
     fb.className = 'fb ' + kind;
     fb.innerHTML = '<strong>' + title + '</strong> ' + html;
-    typeset(fb);
   }
   function updateScore(){
     $('score').innerHTML = n === 0 ? 'No questions finished yet'
@@ -369,8 +300,7 @@ input.cell:read-only{cursor:default}
     primary.textContent = type === 'fill' ? 'Check table' : 'Check answer';
     hintBtn.disabled = false; revealBtn.disabled = false;
     buildRows();
-    buildSteps();
-    showWork(0);
+    setPair();
     showFb('', 'Your turn.', type === 'fill'
       ? 'z = 0 sits at the mean. Each step in z moves one standard deviation.'
       : 'Neighboring z-scores are 1 apart. Use that to work out the missing value.');
@@ -390,7 +320,6 @@ input.cell:read-only{cursor:default}
     document.querySelectorAll('input.cell').forEach(function(i){ i.readOnly = true; });
     hintBtn.disabled = true; revealBtn.disabled = true;
     primary.textContent = 'Next question';
-    showWork(steps.length);
     primary.focus();
   }
   function fillAll(){
@@ -421,7 +350,7 @@ input.cell:read-only{cursor:default}
     }
     if (!wrong.length){
       fillAll();
-      showFb('good', 'All seven are right.', 'Each step to the right adds ' + T('\\sigma') + ' = ' + num(q.sd) + ' ' + esc(q.c.unit) + ', and each step to the left subtracts it.');
+      showFb('good', 'All seven are right.', 'Each step to the right adds the standard deviation, ' + num(q.sd) + ' ' + esc(q.c.unit) + ', and each step to the left subtracts it.');
       finish();
       return;
     }
@@ -431,9 +360,9 @@ input.cell:read-only{cursor:default}
     });
     var noMean = wrong.length >= 2 && wrong.every(function(i){ return Math.abs(vals[i] - r2(Z[i] * q.sd)) < TOL; });
     var msg;
-    if (mirror) msg = 'Left of the mean the values get smaller. For negative z, subtract ' + T('\\sigma') + ' from the mean.';
-    else if (noMean) msg = 'Those are z times ' + T('\\sigma') + ' only. Add the mean, ' + num(q.mu) + ', to each.';
-    else if (wrong.indexOf(3) >= 0) msg = 'z = 0 is the mean, so the value there is ' + T('\\mu') + '.';
+    if (mirror) msg = 'Left of the mean the values get smaller. For negative z, subtract the standard deviation from the mean.';
+    else if (noMean) msg = 'Those are z times the standard deviation only. Add the mean, ' + num(q.mu) + ', to each.';
+    else if (wrong.indexOf(3) >= 0) msg = 'z = 0 is the mean, so the value there is the mean, ' + num(q.mu) + '.';
     else msg = 'Red cells need another look. Each step of 1 in z moves one standard deviation from the mean.';
     if (attempts >= 2 && hintLevel < 2) msg += ' Try the hint.';
     showFb('bad', (7 - wrong.length) + ' of 7 are right.', msg);
@@ -459,7 +388,7 @@ input.cell:read-only{cursor:default}
     if (!isMean && q.d !== 1 && near(q.delta)){
       msg = 'That is the change in value from z = ' + num(q.a) + ' to z = ' + num(q.b) + ', which spans ' + q.d + ' z-steps. Divide by ' + q.d + '.';
     } else if (isMean && near(q.sd)){
-      msg = 'That is the standard deviation. Use it with the z-score formula and one shown value to find the mean.';
+      msg = 'That is the standard deviation. Now step from a shown value back to z = 0 to find the mean.';
     } else if (shownVals){
       msg = 'That is one of the values shown in the table. ' + (isMean ? 'The mean is the value at z = 0.' : 'Find how far apart two values are per z-step.');
     } else {
@@ -475,20 +404,19 @@ input.cell:read-only{cursor:default}
     if (status === 'done') return;
     hintLevel = Math.min(2, hintLevel + 1);
     q.clean = false;
-    showWork(hintSteps[hintLevel - 1]);
     var t = q.type;
     if (hintLevel === 1){
       showFb('info', 'Hint 1.', t === 'fill'
-        ? 'z = 0 is the mean, and each step of 1 in z moves one standard deviation. Any cell comes from ' + T('z = \\dfrac{x - \\mu}{\\sigma}') + '.'
+        ? 'z = 0 is the mean. Each step to the right adds one standard deviation, and each step to the left subtracts one.'
         : t === 'sd'
           ? 'Neighboring z-scores are 1 apart, so neighboring values are one standard deviation apart. Count the z-steps between two shown values.'
-          : 'First find the standard deviation from the spacing between two shown values.');
+          : 'The mean is the value at z = 0. Neighboring z-scores are 1 apart, so neighboring values are one standard deviation apart.');
     } else {
       showFb('info', 'Hint 2.', t === 'fill'
-        ? 'Here is z = 2 worked as an example. Values grow to the right of the mean and shrink to the left.'
+        ? 'Start with ' + num(q.mu) + ' at z = 0. Add ' + num(q.sd) + ' to get z = 1, add it again for z = 2, and keep going. Subtract to go left.'
         : t === 'sd'
-          ? 'Find how much the value changes between those two cells, then divide by the number of z-steps.'
-          : 'Now use the z-score formula with one shown value and solve for ' + T('\\mu') + '.');
+          ? 'The shown values at z = ' + num(q.a) + ' and z = ' + num(q.b) + ' are ' + q.d + ' steps apart. Find how much the value changes, then divide by ' + q.d + '.'
+          : 'Find the standard deviation from two shown values (change in value divided by z-steps). Then step from a shown value back to z = 0.');
       hintBtn.disabled = true;
     }
   }
